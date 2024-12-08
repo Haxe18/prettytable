@@ -1754,6 +1754,9 @@ class PrettyTable:
         else:
             widths = len(self.field_names) * [0]
 
+        import copy
+        header_width = copy.deepcopy(widths)
+
         for row in rows:
             for index, value in enumerate(row):
                 fieldname = self.field_names[index]
@@ -1792,7 +1795,36 @@ class PrettyTable:
                 scale = (self._max_table_width - markup_chars) / (
                     table_width - markup_chars
                 )
+
+                # Store the new calculated width in class
                 self._widths = [max(1, int(w * scale)) for w in widths]
+
+                # Init some needed vars to compare
+                scale_diff = 0
+                scale_index_skip = []
+
+                # Loop over all elements in self._widths, by index and content
+                for index, width in enumerate(self._widths):
+                    # Check if the calculated column width is lower than the headers
+                    if width <= header_width[index]:
+                        # Add difference between calculated and original value to scale_diff
+                        scale_diff += header_width[index] - width
+                        # Store the index to skip in scale_index_skip
+                        scale_index_skip.append(index)
+
+                # If we found a difference, table header chars would be decreased
+                if scale_diff > 0:
+                    # Calculate the diff per column we need to subtract
+                    diff_per_column = int(scale_diff / len(scale_index_skip))
+
+                    # Loop again over self._widths, by index and content
+                    for index, width in enumerate(self._widths):
+                        if index in scale_index_skip:
+                            # Index was scaled down and needs to be replaced with header length
+                            self._widths[index] = header_width[index]
+                        else:
+                            # Index needs to be reduced, other indexes were increased, we need to decreased here
+                            self._widths[index] = self._widths[index] - diff_per_column
 
         # Are we under min_table_width or title width?
         if self._min_table_width or options["title"]:
